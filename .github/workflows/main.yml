@@ -1,0 +1,62 @@
+name: Build Android APK with Buildozer
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+
+    - name: Get Date
+      id: get-date
+      run: |
+        echo "date=$(date +'%Y-%m-%d')" >> $GITHUB_OUTPUT
+
+    - name: Cache Buildozer global directory
+      uses: actions/cache@v3
+      with:
+        path: ~/.buildozer
+        key: buildozer-global-${{ runner.os }}-${{ steps.get-date.outputs.date }}
+
+    - name: Cache Buildozer local directory
+      uses: actions/cache@v3
+      with:
+        path: .buildozer
+        key: buildozer-local-${{ runner.os }}-${{ steps.get-date.outputs.date }}
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-backend: 'cpython'
+        python-version: '3.10'
+
+    - name: Install dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y libsqlite3-dev
+        pip install --upgrade pip
+        pip install buildozer cython virtualenv
+
+    - name: Auto-generate buildozer.spec if missing
+      run: |
+        if [ ! -f buildozer.spec ]; then
+          buildozer init
+          # Basic modifications for app name
+          sed -i 's/^title = My Application/title = My Calculator/' buildozer.spec
+          sed -i 's/^package.name = myapp/package.name = mycalculator/' buildozer.spec
+        fi
+
+    - name: Build with Buildozer
+      run: |
+        buildozer android debug
+
+    - name: Upload APK Artifact
+      uses: actions/upload-artifact@v3
+      with:
+        name: Android-APK
+        path: bin/*.apk
+        
